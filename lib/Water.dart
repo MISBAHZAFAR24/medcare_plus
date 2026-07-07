@@ -42,7 +42,7 @@ class _WaterState extends State<Water> {
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       final now = TimeOfDay.now();
-      if (now.hour == time!.hour && now.minute == time!.minute) {dir
+      if (now.hour == time!.hour && now.minute == time!.minute) {
         _audioPlayer.play(AssetSource('audio/samsung_galaxy_s22.mp3'));
         timer.cancel();
         ScaffoldMessenger.of(context).showSnackBar(

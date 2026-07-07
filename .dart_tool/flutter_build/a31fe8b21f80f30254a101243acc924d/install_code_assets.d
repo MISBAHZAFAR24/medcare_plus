@@ -1,0 +1,1 @@
+ C:\\Users\\Hp\\AndroidStudioProjects\\medcare_plus\\.dart_tool\\flutter_build\\a31fe8b21f80f30254a101243acc924d\\native_assets.json: 

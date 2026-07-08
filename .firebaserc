@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "medcare-app-2304"
-  }
+    "default": "medcare-app-2304",
+    "production": "medcare-app-2304"
+  },
+  "targets": {},
+  "etags": {}
 }

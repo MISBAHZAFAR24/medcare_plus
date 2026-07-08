@@ -1,1 +1,39 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"medcare-app-2304","appId":"1:695387301108:android:eb8457ad9e58f616e26aa1","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"medcare-app-2304","configurations":{"android":"1:695387301108:android:eb8457ad9e58f616e26aa1","ios":"1:695387301108:ios:4a3d0490bf9794fee26aa1","macos":"1:695387301108:ios:4a3d0490bf9794fee26aa1","web":"1:695387301108:web:752bdece0cea67ffe26aa1","windows":"1:695387301108:web:ee04a17ac35a40c0e26aa1"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "medcare-app-2304",
+          "appId": "1:695387301108:android:eb8457ad9e58f616e26aa1",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "medcare-app-2304",
+          "configurations": {
+            "android": "1:695387301108:android:eb8457ad9e58f616e26aa1",
+            "ios": "1:695387301108:ios:4a3d0490bf9794fee26aa1",
+            "macos": "1:695387301108:ios:4a3d0490bf9794fee26aa1",
+            "web": "1:695387301108:web:752bdece0cea67ffe26aa1",
+            "windows": "1:695387301108:web:ee04a17ac35a40c0e26aa1"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ]
+}

@@ -35,7 +35,7 @@ flutter:
   assets:
     - assets/icon.png
     - assets/audio/samsung_galaxy_s22.mp3
-    - .env
+
 
 flutter_icons:
   android: true

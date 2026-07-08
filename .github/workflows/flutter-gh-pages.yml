@@ -26,7 +26,7 @@ jobs:
           channel: stable
 
       - name: Create .env
-      - run: echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" > .env
+        run: echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" > .env
 
       - run: flutter pub get
       - run: flutter build web --release --base-href /medcare_plus/

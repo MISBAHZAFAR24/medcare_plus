@@ -10,6 +10,10 @@ import 'doctor_screen.dart';
 import 'health.dart';
 import 'Water.dart';
 import 'Disease.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+
 
 List<Map<String, dynamic>> healthRecords = [];
 
@@ -85,8 +89,12 @@ Future scheduleNotification(
 
 // ================= MAIN =================
 void main() async {
-  // 1. Engine aur Firebase setup
+  // 1. Engine, Env aur Firebase setup
   WidgetsFlutterBinding.ensureInitialized();
+
+  // .env file load karna
+  await dotenv.load(fileName: ".env");
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -254,7 +262,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 15),
                     TextButton(
                       onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Signup())),
-                      child: const Text("Create New Account", style: TextStyle(color: Colors.teal)),
+                      child: const Text("Create New Account!!", style: TextStyle(color: Colors.teal)),
                     )
                   ],
                 ),
@@ -298,7 +306,7 @@ class _SignupState extends State<Signup> {
     // Basic validation check
     if (nameCtrl.text.isEmpty || emailCtrl.text.isEmpty || passCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Bhai, saari details bhado! ✍️"), backgroundColor: Colors.orange),
+        const SnackBar(content: Text("Bro fill the details!! ✍️"), backgroundColor: Colors.orange),
       );
       return;
     }
@@ -310,7 +318,7 @@ class _SignupState extends State<Signup> {
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Account Created! 🎉"), backgroundColor: Colors.teal),
+        const SnackBar(content: Text("Account Created!! 🎉"), backgroundColor: Colors.teal),
       );
 
       // 2️⃣ Signup ke baad Home par naam ke saath bhej rahe hain

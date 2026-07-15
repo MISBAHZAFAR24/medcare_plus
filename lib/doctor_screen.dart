@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'main.dart';
 import 'Appointment_screen.dart';
 
@@ -7,6 +8,8 @@ class DoctorScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+
     // 📝 COMPLETE LIST OF 50 DOCTORS WITH EMOJIS & DATA
     final List<Map<String, String>> docs = [
       {"name": "Dr. Aamir Khan", "spec": "Cardiologist", "fees": "₹800", "emoji": "🫀"},
@@ -53,7 +56,6 @@ class DoctorScreen extends StatelessWidget {
       {"name": "Dr. Ashish Gupta", "spec": "ENT Specialist", "fees": "₹660", "emoji": "👂"},
       {"name": "Dr. Pooja Shah", "spec": "Dentist", "fees": "₹340", "emoji": "🦷"},
 
-      // 🌿 AYURVEDIC SPECIALISTS
       {"name": "Dr. Ravi Ayurveda", "spec": "Ayurvedic Specialist", "fees": "₹300", "emoji": "🌿"},
       {"name": "Dr. Suman Ayurveda", "spec": "Ayurvedic Specialist", "fees": "₹350", "emoji": "🍃"},
       {"name": "Dr. Harish Ayurveda", "spec": "Ayurvedic Specialist", "fees": "₹320", "emoji": "🌱"},
@@ -67,96 +69,122 @@ class DoctorScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text("Available Doctors 👨‍⚕️", style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(25)),
+        flexibleSpace: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(color: Colors.teal.withValues(alpha: 0.1)),
+          ),
         ),
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 20),
-        itemCount: docs.length,
-        itemBuilder: (context, i) {
-          final d = docs[i];
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark
+                ? [const Color(0xFF0F172A), const Color(0xFF1E293B)]
+                : [const Color(0xFFF0F4F8), const Color(0xFFFFFFFF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(15, 120, 15, 20),
+          itemCount: docs.length,
+          itemBuilder: (context, i) {
+            final d = docs[i];
+            Color themeColor = d["spec"]!.contains("Ayurvedic") ? Colors.green : Colors.teal;
 
-          // Custom color based on Specialization
-          Color themeColor = d["spec"]!.contains("Ayurvedic") ? Colors.green : Colors.teal;
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 15),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: ListTile(
-                onTap: () {
-                  addHealthRecord(
-                      "Doctor Consultation",
-                      "Visited ${d['name']} (${d['spec']})", // Ab naam dikhega!
-                      Icons.medical_services_rounded,
-                      themeColor
-                  );
-                  // Navigator logic
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AppointmentScreen(doc: d), // Doctor ka data bhej rahe hain
-                    ),
-                  );
-                },
-                contentPadding: const EdgeInsets.all(12),
-                leading: Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: themeColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(15),
+            return Container(
+              margin: const EdgeInsets.only(bottom: 15),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+                borderRadius: BorderRadius.circular(25),
+                border: Border.all(color: isDark ? Colors.white10 : Colors.transparent),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
                   ),
-                  alignment: Alignment.center,
-                  child: Text(d["emoji"]!, style: const TextStyle(fontSize: 32)),
-                ),
-                title: Text(
-                  d["name"]!,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 4),
-                    Text(d["spec"]!, style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(25),
+                child: Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    onTap: () {
+                      addHealthRecord(
+                          "Doctor Consultation",
+                          "Visited ${d['name']} (${d['spec']})",
+                          Icons.medical_services_rounded,
+                          themeColor
+                      );
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AppointmentScreen(doc: d),
+                        ),
+                      );
+                    },
+                    contentPadding: const EdgeInsets.all(15),
+                    leading: Container(
+                      width: 65,
+                      height: 65,
                       decoration: BoxDecoration(
-                        color: themeColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        gradient: LinearGradient(
+                          colors: [themeColor.withValues(alpha: 0.2), themeColor.withValues(alpha: 0.05)],
+                        ),
+                        borderRadius: BorderRadius.circular(18),
                       ),
-                      child: Text(
-                        "Consultancy: ${d["fees"]}",
-                        style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: 12),
+                      alignment: Alignment.center,
+                      child: Text(d["emoji"]!, style: const TextStyle(fontSize: 35)),
+                    ),
+                    title: Text(
+                      d["name"]!,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: isDark ? Colors.white : Colors.black87,
                       ),
                     ),
-                  ],
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 5),
+                        Text(d["spec"]!, style: TextStyle(color: isDark ? Colors.white60 : Colors.grey.shade600, fontSize: 14)),
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: themeColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            "Fees: ${d["fees"]}",
+                            style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                    trailing: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: themeColor.withValues(alpha: 0.05),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: themeColor),
+                    ),
+                  ),
                 ),
-                trailing: Icon(Icons.arrow_forward_ios_rounded, size: 18, color: themeColor.withValues(alpha: 0.5)),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

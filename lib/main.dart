@@ -12,11 +12,10 @@ import 'Water.dart';
 import 'Disease.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-
-
+import 'dart:ui';
 
 List<Map<String, dynamic>> healthRecords = [];
-
+final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 
 void addHealthRecord(String title, String detail, IconData icon, Color color) {
   healthRecords.insert(0, {
@@ -30,47 +29,26 @@ void addHealthRecord(String title, String detail, IconData icon, Color color) {
 }
 
 // ================= NOTIFICATION =================
-final FlutterLocalNotificationsPlugin notifications =
-FlutterLocalNotificationsPlugin();
+final FlutterLocalNotificationsPlugin notifications = FlutterLocalNotificationsPlugin();
 
 Future initNotification() async {
   const android = AndroidInitializationSettings('@mipmap/ic_launcher');
   const settings = InitializationSettings(android: android);
-
   await notifications.initialize(settings);
-
-  final androidPlugin = notifications
-      .resolvePlatformSpecificImplementation<
-      AndroidFlutterLocalNotificationsPlugin>();
-
+  final androidPlugin = notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
   await androidPlugin?.requestNotificationsPermission();
-
   tz.initializeTimeZones();
-
 }
 
-Future scheduleNotification(
-    int id, String title, String body, TimeOfDay time) async {
-
+Future scheduleNotification(int id, String title, String body, TimeOfDay time) async {
   final now = DateTime.now();
-
-  final schedule =
-  DateTime(now.year, now.month, now.day, time.hour, time.minute);
-
+  final schedule = DateTime(now.year, now.month, now.day, time.hour, time.minute);
   await notifications.zonedSchedule(
-    id,
-    title,
-    body,
-    tz.TZDateTime.from(
-      schedule.isBefore(now)
-          ? schedule.add(const Duration(days: 1))
-          : schedule,
-      tz.local,
-    ),
+    id, title, body,
+    tz.TZDateTime.from(schedule.isBefore(now) ? schedule.add(const Duration(days: 1)) : schedule, tz.local),
     const NotificationDetails(
       android: AndroidNotificationDetails(
-        'medcare_channel_2',
-        'MedCare Alerts',
+        'medcare_channel_2', 'MedCare Alerts',
         importance: Importance.max,
         priority: Priority.high,
         playSound: true,
@@ -78,106 +56,56 @@ Future scheduleNotification(
       ),
     ),
     androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-
-    // ✅ REQUIRED FIX
-    uiLocalNotificationDateInterpretation:
-    UILocalNotificationDateInterpretation.absoluteTime,
-
+    uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
     matchDateTimeComponents: DateTimeComponents.time,
   );
 }
 
-// ================= MAIN =================
 void main() async {
-  // 1. Engine, Env aur Firebase setup
   WidgetsFlutterBinding.ensureInitialized();
-
-  // .env file load karna
   await dotenv.load(fileName: ".env");
-
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  // 2. Notification setup
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await initNotification();
-
-  // 3. App ko start karna
   runApp(const MyApp());
 }
 
-// ================= GLOBAL =================
-String? name;
-String? email;
-String? pass;
-
-// ================= APP =================
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'MedCare Plus',
-
-      // ✅ PREMIUM THEME
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        scaffoldBackgroundColor: const Color(0xFFF5F7FA), // Light Gray background
-
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 2,
-          backgroundColor: Colors.teal,
-          foregroundColor: Colors.white,
-        ),
-
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.teal,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (context, currentMode, _) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'MedCare Plus',
+          themeMode: currentMode,
+          theme: ThemeData(
+            useMaterial3: true,
+            fontFamily: 'Poppins',
+            colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+            scaffoldBackgroundColor: const Color(0xFFF8FAFC),
           ),
-        ),
-      ),
-
-
-      home:  LoginScreen(),
+          darkTheme: ThemeData.dark().copyWith(
+            colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal, brightness: Brightness.dark),
+            scaffoldBackgroundColor: const Color(0xFF0F172A),
+          ),
+          home: StreamBuilder<User?>(
+            stream: FirebaseAuth.instance.authStateChanges(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+              return snapshot.hasData ? Home(snapshot.data?.displayName ?? "User") : const LoginScreen();
+            },
+          ),
+        );
+      },
     );
   }
 }
 
-// =================  UI CARD =================
-Widget customCard({required Widget child}) {
-  return Container(
-    margin: const EdgeInsets.all(10),
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-
-      // ✅ PREMIUM SHADOW EFFECT
-      boxShadow: const [
-        BoxShadow(
-          color: Colors.black12,
-          blurRadius: 10,
-          spreadRadius: 2,
-          offset: Offset(0, 4), // Shadow thodi niche dikhegi (Realistic look)
-        )
-      ],
-    ),
-    child: child,
-  );
-}
-// ================= LOGIN =================
+// ================= LOGIN SCREEN =================
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
-
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -185,577 +113,632 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final emailCtrl = TextEditingController();
   final passCtrl = TextEditingController();
+  bool _isLoading = false;
 
-  InputDecoration inputStyle(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      filled: true,
-      fillColor: Colors.grey[100],
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
-      ),
-    );
-  }
-
-  // 🔹 Firebase Login Logic
   void loginAction() async {
+    if (emailCtrl.text.isEmpty || passCtrl.text.isEmpty) {
+      _showMsg("Please fill all fields", Colors.orange);
+      return;
+    }
+    setState(() => _isLoading = true);
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: emailCtrl.text.trim(),
         password: passCtrl.text.trim(),
       );
-      // Success: Next Page
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const Home("welcome to medcare+")),
-      );
+      if (!mounted) return;
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => Home(userCredential.user?.displayName ?? "User")));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Login Fail: Check Email/Pass"), backgroundColor: Colors.red),
-      );
+      _showMsg("Login Fail! Check details.", Colors.red);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showMsg(String msg, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: color,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          // Background Icons
-          Positioned(top: 80, left: 30, child: Icon(Icons.add, size: 120, color: Colors.teal.withValues(alpha: 0.1))),
-          Positioned(bottom: 80, right: 20, child: Icon(Icons.local_hospital, size: 150, color: Colors.teal.withValues(alpha: 0.1))),
-
-          Center(
-            child: SingleChildScrollView(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: isDark
+                ? [const Color(0xFF0F172A), const Color(0xFF1E293B)]
+                : [const Color(0xFFF0FDFA), Colors.white],
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Decorative Blobs
+            Positioned(
+              top: -100,
+              right: -50,
               child: Container(
-                margin: const EdgeInsets.all(25),
-                padding: const EdgeInsets.all(25),
+                width: 300,
+                height: 300,
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(25),
-                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 15)],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text("MEDCARE+", style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.teal)),
-                    const SizedBox(height: 25),
-                    TextField(controller: emailCtrl, decoration: inputStyle("Email")),
-                    const SizedBox(height: 15),
-                    TextField(controller: passCtrl, obscureText: true, decoration: inputStyle("Password")),
-                    const SizedBox(height: 25),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: loginAction,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text("LOGIN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    TextButton(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Signup())),
-                      child: const Text("Create New Account!!", style: TextStyle(color: Colors.teal)),
-                    )
-                  ],
+                  shape: BoxShape.circle,
+                  color: Colors.teal.withValues(alpha: 0.05),
                 ),
               ),
             ),
+            Positioned(
+              bottom: -150,
+              left: -100,
+              child: Container(
+                width: 400,
+                height: 400,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.teal.withValues(alpha: 0.03),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Logo Section
+                      TweenAnimationBuilder(
+                        tween: Tween<double>(begin: 0, end: 1),
+                        duration: const Duration(seconds: 1),
+                        builder: (context, value, child) {
+                          return Opacity(
+                            opacity: value,
+                            child: Transform.scale(scale: value, child: child),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.teal.withValues(alpha: 0.1),
+                          ),
+                          child: const Icon(Icons.health_and_safety_rounded, size: 80, color: Colors.teal),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        "MEDCARE+",
+                        style: TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.teal,
+                          letterSpacing: 4,
+                        ),
+                      ),
+                      const Text(
+                        "Your Personal Health Companion",
+                        style: TextStyle(color: Colors.grey, fontSize: 14, letterSpacing: 1),
+                      ),
+                      const SizedBox(height: 60),
+
+                      // Glassmorphism Input Fields
+                      _buildTextField(emailCtrl, "Email Address", Icons.alternate_email_rounded, false, isDark),
+                      const SizedBox(height: 20),
+                      _buildTextField(passCtrl, "Password", Icons.lock_open_rounded, true, isDark),
+
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () {},
+                          child: const Text("Forgot Password?", style: TextStyle(color: Colors.teal, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+
+                      // Animated Login Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 60,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : loginAction,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                            elevation: 8,
+                            shadowColor: Colors.teal.withValues(alpha: 0.4),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          ),
+                          child: _isLoading
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Text(
+                                  "LOGIN",
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            "Don't have an account? ",
+                            style: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
+                          ),
+                          GestureDetector(
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const Signup())),
+                            child: const Text(
+                              "Sign Up",
+                              style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(TextEditingController ctrl, String hint, IconData icon, bool obscure, bool isDark) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
           )
         ],
+      ),
+      child: TextField(
+        controller: ctrl,
+        obscureText: obscure,
+        style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+        decoration: InputDecoration(
+          prefixIcon: Icon(icon, color: Colors.teal),
+          hintText: hint,
+          hintStyle: const TextStyle(color: Colors.grey, fontSize: 15),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        ),
       ),
     );
   }
 }
-// ================= SIGNUP =================
+
+// ================= SIGNUP SCREEN =================
 class Signup extends StatefulWidget {
   const Signup({super.key});
-
   @override
   State<Signup> createState() => _SignupState();
 }
 
 class _SignupState extends State<Signup> {
-  // 1️⃣ Naya Name Controller add kiya
   final nameCtrl = TextEditingController();
   final emailCtrl = TextEditingController();
   final passCtrl = TextEditingController();
+  bool _isLoading = false;
 
-  InputDecoration inputStyle(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      filled: true,
-      fillColor: Colors.grey[100],
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
-      ),
-    );
-  }
-
-  // 🔹 Firebase Signup Logic
   void signupAction() async {
-    // Basic validation check
     if (nameCtrl.text.isEmpty || emailCtrl.text.isEmpty || passCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Bro fill the details!! ✍️"), backgroundColor: Colors.orange),
-      );
+      _showMsg("Please fill all fields", Colors.orange);
       return;
     }
-
+    setState(() => _isLoading = true);
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: emailCtrl.text.trim(),
         password: passCtrl.text.trim(),
       );
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Account Created!! 🎉"), backgroundColor: Colors.teal),
-      );
-
-      // 2️⃣ Signup ke baad Home par naam ke saath bhej rahe hain
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => Home(nameCtrl.text.trim())),
-      );
-
+      await userCredential.user?.updateDisplayName(nameCtrl.text.trim());
+      if (!mounted) return;
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => Home(nameCtrl.text.trim())));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: ${e.toString()}"), backgroundColor: Colors.red),
-      );
+      _showMsg(e.toString(), Colors.red);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showMsg(String msg, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: color,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0, foregroundColor: Colors.teal),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 25),
-            padding: const EdgeInsets.all(25),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 15)],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.person_add_alt_1, size: 50, color: Colors.teal),
-                const SizedBox(height: 15),
-                const Text("SIGN UP", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.teal)),
-                const SizedBox(height: 30),
-
-                // 3️⃣ NAAM WALA TEXTFIELD
-                TextField(controller: nameCtrl, decoration: inputStyle("Full Name")),
-                const SizedBox(height: 15),
-
-                TextField(controller: emailCtrl, decoration: inputStyle("Email Address")),
-                const SizedBox(height: 15),
-
-                TextField(controller: passCtrl, obscureText: true, decoration: inputStyle("Create Password")),
-                const SizedBox(height: 25),
-
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: signupAction,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: const Text("REGISTER", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : Colors.black87),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark
+                ? [const Color(0xFF0F172A), const Color(0xFF1E293B)]
+                : [const Color(0xFFF0FDFA), Colors.white],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                children: [
+                  const Text(
+                    "Create Account",
+                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.teal),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  const Text(
+                    "Start your journey to better health",
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                  const SizedBox(height: 50),
+                  _buildTextField(nameCtrl, "Full Name", Icons.person_outline_rounded, false, isDark),
+                  const SizedBox(height: 20),
+                  _buildTextField(emailCtrl, "Email Address", Icons.alternate_email_rounded, false, isDark),
+                  const SizedBox(height: 20),
+                  _buildTextField(passCtrl, "Password", Icons.lock_open_rounded, true, isDark),
+                  const SizedBox(height: 40),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 60,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : signupAction,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                        elevation: 8,
+                        shadowColor: Colors.teal.withValues(alpha: 0.4),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                      child: _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              "REGISTER",
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "Already have an account? ",
+                        style: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: const Text(
+                          "Login",
+                          style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+
+  Widget _buildTextField(TextEditingController ctrl, String hint, IconData icon, bool obscure, bool isDark) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          )
+        ],
+      ),
+      child: TextField(
+        controller: ctrl,
+        obscureText: obscure,
+        style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+        decoration: InputDecoration(
+          prefixIcon: Icon(icon, color: Colors.teal),
+          hintText: hint,
+          hintStyle: const TextStyle(color: Colors.grey, fontSize: 15),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        ),
+      ),
+    );
+  }
 }
 
-
-// ================= 🏠 DASHBOARD BODY =================
+// ================= DASHBOARD BODY =================
 class DashboardBody extends StatelessWidget {
   const DashboardBody({super.key});
 
   @override
   Widget build(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 📊 Progress Card
+          // 🏆 Premium Health Score Card
           Container(
+            height: 180,
+            width: double.infinity,
             padding: const EdgeInsets.all(25),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Colors.teal, Color(0xFF1DE9B6)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(color: Colors.teal.withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 8))
-              ],
+              gradient: const LinearGradient(colors: [Colors.teal, Color(0xFF0D9488)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+              borderRadius: BorderRadius.circular(35),
+              boxShadow: [BoxShadow(color: Colors.teal.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 10))],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Stack(
               children: [
-                const Text("Your Health Score ⚡",
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
-                const SizedBox(height: 15),
-                const LinearProgressIndicator(
-                  value: 0.75,
-                  color: Colors.white,
-                  backgroundColor: Colors.white24,
-                  minHeight: 8,
+                Positioned(right: -20, bottom: -20, child: Icon(Icons.favorite, size: 150, color: Colors.white.withValues(alpha: 0.1))),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text("Daily Health Score", style: TextStyle(color: Colors.white70, fontSize: 16)),
+                    const SizedBox(height: 5),
+                    const Text("85/100", style: TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 15),
+                    Row(
+                      children: [
+                        const Icon(Icons.bolt, color: Colors.amber, size: 20),
+                        const SizedBox(width: 5),
+                        Text("You are doing great today!", style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13)),
+                      ],
+                    )
+                  ],
                 ),
-                const SizedBox(height: 15),
-                const Text("Bhai, aap 75% fit hain! 🔥",
-                    style: TextStyle(color: Colors.white, fontSize: 14)),
               ],
             ),
           ),
 
-          const SizedBox(height: 30),
-          const Text("Main Menu 📋",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
-          const SizedBox(height: 15),
+          const SizedBox(height: 35),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("Our Services", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.blueGrey[900])),
+              TextButton(onPressed: () {}, child: const Text("See All", style: TextStyle(color: Colors.teal))),
+            ],
+          ),
+          const SizedBox(height: 10),
 
-          // 🧊 Working Grid
+          // 🧊 Advanced Grid
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 2,
-            crossAxisSpacing: 18,
-            mainAxisSpacing: 18,
-            childAspectRatio: 1.1,
+            crossAxisSpacing: 20,
+            mainAxisSpacing: 20,
+            childAspectRatio: 1,
             children: [
-              // 1. Water Tracker
-              _menuTile(context, "Water", const Water(), Icons.water_drop, Colors.blue, "Stay Hydrated 💧", () {
-                addHealthRecord("Water Intake", "Drank 1 Glass (250ml)", Icons.water_drop, Colors.blue);
-              }),
-
-              // 2. Doctor Search
-              _menuTile(context, "Doctors", const DoctorScreen(), Icons.medical_services_rounded, Colors.purple, "Find Specialists 👨‍⚕️", () {
-                addHealthRecord("Doctor Search", "Searched for nearby Specialists", Icons.medical_services_rounded, Colors.purple);
-              }),
-
-              // 3. Diseases Check
-              _menuTile(context, "Diseases", const Disease(), Icons.coronavirus, Colors.green, "Be Safe 🦠", () {
-                addHealthRecord("Health Research", "Checked Symptoms for Flu/Fever", Icons.coronavirus, Colors.green);
-              }),
-              // 4. chatbot check
-              _menuTile(context, "AI Chat", const ChatScreen(), Icons.smart_toy_rounded, Colors.orange, "Health Assistant 🤖", () {
-                addHealthRecord("Chat Started", "Opened AI Health Assistant", Icons.smart_toy_rounded, Colors.orange);
-              }),
-
-              // 5. Vitals Check
-              _menuTile(context, "Vitals", const Health(), Icons.favorite, Colors.red, "Check Stats ❤️", () {
-                addHealthRecord("Vitals Checkup", "Heart Rate & SpO2 Checked", Icons.favorite, Colors.red);
-              }),
+              _glassTile(context, "AI Consult", const ChatScreen(), Icons.auto_awesome, Colors.orange, "Ask MedBot", isDark),
+              _glassTile(context, "Doctors", const DoctorScreen(), Icons.medical_services, Colors.indigo, "Top Experts", isDark),
+              _glassTile(context, "Water", const Water(), Icons.water_drop, Colors.blue, "Hydration", isDark),
+              _glassTile(context, "Vitals", const Health(), Icons.favorite, Colors.red, "Heart & BMI", isDark),
+              _glassTile(context, "Disease", const Disease(), Icons.medication_liquid, Colors.purple, "Meds & Guide", isDark),
             ],
           ),
+          const SizedBox(height: 30),
         ],
       ),
     );
   }
 
-  // ✅ FIXED: Added 'VoidCallback action' parameter to handle history recording
-  Widget _menuTile(BuildContext context, String title, Widget screen, IconData icon, Color color, String sub, VoidCallback action) {
-    return InkWell(
-      onTap: () {
-        action(); // Pehle history record karega
-        Navigator.push(context, MaterialPageRoute(builder: (_) => screen)); // Phir screen par jayega
-      },
-      borderRadius: BorderRadius.circular(25),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: [
-            BoxShadow(color: color.withValues(alpha: 0.08), blurRadius: 15, offset: const Offset(0, 5))
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
-              child: Icon(icon, color: color, size: 32),
-            ),
-            const SizedBox(height: 10),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text(sub, style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
-          ],
+  Widget _glassTile(BuildContext context, String title, Widget screen, IconData icon, Color color, String sub, bool isDark) {
+    return TweenAnimationBuilder(
+      tween: Tween<double>(begin: 0.9, end: 1.0),
+      duration: const Duration(milliseconds: 200),
+      builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
+      child: InkWell(
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => screen)),
+        borderRadius: BorderRadius.circular(30),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 5))],
+            border: Border.all(color: isDark ? Colors.white10 : Colors.teal.withValues(alpha: 0.05), width: 1),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
+                child: Icon(icon, color: color, size: 30),
+              ),
+              const SizedBox(height: 12),
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(sub, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ================= 👤 PROFILE SCREEN =================
+// ================= PROFILE SCREEN =================
 class ProfileScreen extends StatelessWidget {
   final String userName;
   const ProfileScreen({super.key, required this.userName});
 
   @override
   Widget build(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return SingleChildScrollView(
       child: Column(
         children: [
-          const SizedBox(height: 40),
-          // --- Profile Header ---
-          const Center(
-            child: CircleAvatar(
-              radius: 60,
-              backgroundColor: Colors.teal,
-              child: Icon(Icons.person, size: 70, color: Colors.white),
-            ),
-          ),
-          const SizedBox(height: 15),
-          Text(
-            userName,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-          ),
-          const Text("Medcare+ Premium Member ✨", style: TextStyle(color: Colors.grey, fontSize: 14)),
-
-          const SizedBox(height: 30),
-
-          // --- Action Tiles ---
-
-          // 1. Medical History (Ab ye working hai!)
-          _profileTile(
-            context,
-            Icons.history_rounded,
-            "Medical History",
-            "Check your past records & reports",
-            const MedicalHistory(), // Humne jo naya page banaya tha
-          ),
-
-          // 2. Settings
-          _profileTile(
-            context,
-            Icons.settings_rounded,
-            "Settings",
-            "App notifications & account security",
-            const Center(child: Text("Settings Page Coming Soon ⚙️")),
-          ),
-
-          // 3. Help & Support (AI Chat par le jayega)
-          _profileTile(
-            context,
-            Icons.help_center_rounded,
-            "Support",
-            "Talk to our AI Health Assistant",
-            const ChatScreen(),
-          ),
-
-          const SizedBox(height: 30),
-
-          // --- Log out Button ---
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 25),
-            child: ElevatedButton.icon(
-              onPressed: () {
-                // Logout logic: Navigator.pop(context) ya Login par bhej do
-                Navigator.of(context).popUntil((route) => route.isFirst);
-              },
-              icon: const Icon(Icons.logout_rounded),
-              label: const Text("Log Out", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade50,
-                foregroundColor: Colors.red,
-                elevation: 0,
-                minimumSize: const Size(double.infinity, 55),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              ),
+          const SizedBox(height: 50),
+          Center(
+            child: Stack(
+              children: [
+                CircleAvatar(radius: 65, backgroundColor: Colors.teal.withValues(alpha: 0.2), child: const Icon(Icons.person, size: 80, color: Colors.teal)),
+                Positioned(bottom: 0, right: 0, child: Container(padding: const EdgeInsets.all(8), decoration: const BoxDecoration(color: Colors.teal, shape: BoxShape.circle), child: const Icon(Icons.edit, color: Colors.white, size: 18))),
+              ],
             ),
           ),
           const SizedBox(height: 20),
+          Text(userName, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+          const Text("Silver Member • Since 2024", style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 30),
+          _profileItem(context, Icons.history, "Medical History", "Check past appointments", const MedicalHistory(), isDark),
+          _profileItem(context, Icons.notifications_active_outlined, "Notifications", "Manage your alerts", null, isDark),
+          _profileItem(context, Icons.security, "Privacy & Safety", "Account data settings", null, isDark),
+          const SizedBox(height: 30),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: ElevatedButton(
+              onPressed: () => FirebaseAuth.instance.signOut(),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent.withValues(alpha: 0.1), foregroundColor: Colors.redAccent, elevation: 0, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+              child: const Text("Log Out", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          )
         ],
       ),
     );
   }
 
-  // --- Helper Widget for Tiles (With Navigation) ---
-  Widget _profileTile(BuildContext context, IconData icon, String title, String sub, Widget targetPage) {
+  Widget _profileItem(BuildContext context, IconData icon, String title, String sub, Widget? page, bool isDark) {
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 25, vertical: 5),
-      leading: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(color: Colors.teal.withValues(alpha: 0.1), shape: BoxShape.circle),
-        child: Icon(icon, color: Colors.teal, size: 24),
-      ),
+      leading: Icon(icon, color: Colors.teal),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text(sub, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
-      onTap: () {
-        // Bhai, yahan se navigation handle ho rahi hai
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => targetPage),
-        );
-      },
+      subtitle: Text(sub, style: const TextStyle(fontSize: 12)),
+      trailing: const Icon(Icons.chevron_right, size: 20),
+      onTap: () { if (page != null) Navigator.push(context, MaterialPageRoute(builder: (_) => page)); },
     );
   }
 }
-// =================medical history =================
+
+// ================= MEDICAL HISTORY =================
 class MedicalHistory extends StatelessWidget {
   const MedicalHistory({super.key});
-
   @override
   Widget build(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text("Medical Records 📜", style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.teal,
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text("History"), backgroundColor: Colors.transparent, foregroundColor: Colors.teal),
       body: healthRecords.isEmpty
-          ? const Center(child: Text("Bhai, abhi koi record nahi mila! 📂"))
+          ? const Center(child: Text("No records found yet!"))
           : ListView.builder(
-        padding: const EdgeInsets.all(20),
-        itemCount: healthRecords.length,
-        itemBuilder: (context, index) {
-          final item = healthRecords[index];
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: (item['color'] as Color).withValues(alpha: 0.1),
-                  child: Icon(item['icon'], color: item['color']),
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.all(20),
+              itemCount: healthRecords.length,
+              itemBuilder: (context, index) {
+                final item = healthRecords[index];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 15),
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.teal.withValues(alpha: 0.1))),
+                  child: Row(
                     children: [
-                      Text(item['title'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Text(item['detail'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      Icon(item['icon'], color: item['color']),
+                      const SizedBox(width: 15),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(item['title'], style: const TextStyle(fontWeight: FontWeight.bold)), Text(item['detail'], style: const TextStyle(fontSize: 12, color: Colors.grey))])),
+                      Text(item['time'], style: const TextStyle(fontSize: 11, color: Colors.teal)),
                     ],
                   ),
-                ),
-                Text(item['time'], style: const TextStyle(fontSize: 10, color: Colors.teal)),
-              ],
+                );
+              },
             ),
-          );
-        },
-      ),
     );
   }
 }
-// ================= 📱 HOME STATE =================
+
+// ================= HOME SCREEN =================
 class Home extends StatefulWidget {
   final String name;
   const Home(this.name, {super.key});
-
   @override
   State<Home> createState() => _HomeState();
 }
 
 class _HomeState extends State<Home> {
   int _selectedIndex = 0;
-
-  // Screens List (Sequence matching navigation bar)
-  // Note: Yahan 'late' keyword zaroori hai widget.name use karne ke liye
-  late final List<Widget> _pages = [
-    const DashboardBody(),                 // Index 0
-    const ChatScreen(),                    // Index 1
-    const DoctorScreen(),                  // Index 2
-    ProfileScreen(userName: widget.name),  // Index 3 (Passed dynamic name)
-  ];
+  late final List<Widget> _pages = [const DashboardBody(), const ChatScreen(), const DoctorScreen(), ProfileScreen(userName: widget.name)];
 
   @override
   Widget build(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: false,
-        title: Text(
-          "Hey, ${widget.name} ✨",
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: Colors.teal),
-        ),
+        elevation: 0, backgroundColor: Colors.transparent, centerTitle: false,
+        title: Text("Hello, ${widget.name} 👋", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24, color: Colors.teal)),
         actions: [
-          IconButton(
-              onPressed: () {},
-              icon: const Icon(Icons.notifications_none_rounded, color: Colors.teal)
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: themeNotifier,
+            builder: (context, mode, _) => IconButton(icon: Icon(mode == ThemeMode.light ? Icons.dark_mode : Icons.light_mode, color: Colors.teal), onPressed: () => themeNotifier.value = mode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light),
           ),
+          const SizedBox(width: 10),
         ],
       ),
-
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
-      ),
-
+      body: IndexedStack(index: _selectedIndex, children: _pages),
       bottomNavigationBar: Container(
-        margin: const EdgeInsets.fromLTRB(20, 0, 20, 25),
-        height: 70,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E293B),
-          borderRadius: BorderRadius.circular(35),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 20, offset: const Offset(0, 10))
-          ],
-        ),
+        padding: const EdgeInsets.symmetric(vertical: 15),
+        decoration: BoxDecoration(color: isDark ? const Color(0xFF1E293B) : Colors.white, border: Border(top: BorderSide(color: Colors.teal.withValues(alpha: 0.1)))),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            navItem(Icons.grid_view_rounded, 0),
-            navItem(Icons.chat_bubble_rounded, 1),
-            navItem(Icons.medical_services_rounded, 2),
-            navItem(Icons.person_rounded, 3),
+            _navBtn(Icons.dashboard_rounded, 0),
+            _navBtn(Icons.auto_awesome_rounded, 1),
+            _navBtn(Icons.medical_services_rounded, 2),
+            _navBtn(Icons.person_rounded, 3),
           ],
         ),
       ),
     );
   }
 
-  Widget navItem(IconData icon, int index) {
-    bool isSelected = _selectedIndex == index;
+  Widget _navBtn(IconData icon, int index) {
+    bool sel = _selectedIndex == index;
     return GestureDetector(
       onTap: () => setState(() => _selectedIndex = index),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.tealAccent.withValues(alpha: 0.1) : Colors.transparent,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-            icon,
-            color: isSelected ? Colors.tealAccent : Colors.white60,
-            size: 28
-        ),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: sel ? Colors.teal : Colors.transparent, borderRadius: BorderRadius.circular(15)),
+        child: Icon(icon, color: sel ? Colors.white : Colors.teal.withValues(alpha: 0.5), size: 26),
       ),
     );
   }

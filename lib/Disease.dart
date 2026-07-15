@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:ui';
 import 'package:audioplayers/audioplayers.dart';
+import 'main.dart';
 class Disease extends StatefulWidget {
   const Disease({super.key});
 
@@ -82,6 +84,7 @@ class _DiseaseState extends State<Disease> {
       setState(() {
         result = diseaseData[foundKey];
       });
+      addHealthRecord("Disease Search", "Searched for $foundKey", Icons.search, Colors.purple);
     } else {
       setState(() => result = null);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -96,11 +99,19 @@ class _DiseaseState extends State<Disease> {
   }
 
   void startAlarm() {
-    if (selectedTime == null || result == null) return;
+    if (selectedTime == null || result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Pehle time select karo, bhai! ⏰"), behavior: SnackBarBehavior.floating),
+      );
+      return;
+    }
 
     _timer?.cancel();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Alarm Set for ${selectedTime!.format(context)}")),
+      SnackBar(
+        content: Text("Medicine Reminder Set for ${selectedTime!.format(context)} 💊"),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -108,11 +119,52 @@ class _DiseaseState extends State<Disease> {
       if (now.hour == selectedTime!.hour && now.minute == selectedTime!.minute) {
         _audioPlayer.play(AssetSource('audio/samsung_galaxy_s22.mp3'));
         timer.cancel();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("💊 Medicine Time!")),
-        );
+        _showMedicineAlarmOverlay();
       }
     });
+  }
+
+  void _showMedicineAlarmOverlay() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: AlertDialog(
+          backgroundColor: Colors.white.withValues(alpha: 0.2),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(result?['icon'] ?? "💊", style: const TextStyle(fontSize: 60)),
+              const SizedBox(height: 20),
+              const Text(
+                "Dawa ka Waqt! 💊",
+                style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                "Bhai, aapko apni '${result?['medicine']?.join(', ')}' leni hai. Health first!",
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 30),
+              ElevatedButton(
+                onPressed: () {
+                  _audioPlayer.stop();
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.tealAccent.shade700,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+                child: const Text("OKAY, TAKEN! ✅", style: TextStyle(color: Colors.white)),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void stopAlarm() {
@@ -132,55 +184,183 @@ class _DiseaseState extends State<Disease> {
 
   @override
   Widget build(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      appBar: AppBar(title: const Text("Health Tracker")),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: searchCtrl,
-              decoration: InputDecoration(
-                hintText: "Search Disease",
-                suffixIcon: IconButton(onPressed: searchDisease, icon: const Icon(Icons.search)),
-                border: const OutlineInputBorder(),
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: const Text("Disease & Medicine", style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(color: Colors.teal.withValues(alpha: 0.1)),
+          ),
+        ),
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark 
+                ? [const Color(0xFF071927), const Color(0xFF0F172A)]
+                : [const Color(0xFFF0FDFA), const Color(0xFFF8FAFC)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 120, 20, 20),
+          child: Column(
+            children: [
+              // 🔍 SEARCH BAR
+              TextField(
+                controller: searchCtrl,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                decoration: InputDecoration(
+                  hintText: "Search Disease (e.g. Fever, Cold)",
+                  hintStyle: const TextStyle(color: Colors.grey),
+                  prefixIcon: const Icon(Icons.search, color: Colors.teal),
+                  filled: true,
+                  fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide(color: Colors.teal.withValues(alpha: 0.3)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: Colors.teal, width: 2),
+                  ),
+                ),
+                onSubmitted: (_) => searchDisease(),
               ),
-            ),
-            const SizedBox(height: 20),
-            if (result != null) ...[
-              Card(
-                color: Colors.blue.shade50,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+              const SizedBox(height: 25),
+
+              if (result != null) ...[
+                // 📄 RESULT CARD
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
+                    border: Border.all(color: Colors.teal.withValues(alpha: 0.1)),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("💊 Medicine: ${result!['medicine'].join(', ')}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      const Divider(),
-                      Text("🍎 Diet: ${result!['diet'].join(', ')}"),
-                      Text("⏳ Duration: ${result!['duration']}"),
+                      Row(
+                        children: [
+                          Text(result!['icon'], style: const TextStyle(fontSize: 40)),
+                          const SizedBox(width: 15),
+                          const Text("Medical Advice", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const Divider(height: 30),
+                      _infoRow(Icons.medication, "Medicine", result!['medicine'].join(', '), isDark),
+                      _infoRow(Icons.restaurant, "Diet", result!['diet'].join(', '), isDark),
+                      _infoRow(Icons.calendar_today, "Duration", result!['duration'], isDark),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(onPressed: pickTime, child: const Text("1. Pick Time")),
-              if (selectedTime != null) ...[
-                Text("Selected: ${selectedTime!.format(context)}"),
+
+                const SizedBox(height: 30),
+
+                // ⏰ REMINDER SECTION
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(25),
+                    border: Border.all(color: Colors.teal.withValues(alpha: 0.2)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text("Set Medicine Reminder", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 15),
+                      InkWell(
+                        onTap: pickTime,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(selectedTime == null ? "Select Time" : selectedTime!.format(context),
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+                              const Icon(Icons.access_time, color: Colors.teal),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: startAlarm,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.teal,
+                                padding: const EdgeInsets.symmetric(vertical: 15),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                              ),
+                              child: const Text("START ALARM", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: stopAlarm,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
+                                foregroundColor: Colors.redAccent,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(vertical: 15),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                              ),
+                              child: const Text("STOP"),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                const SizedBox(height: 50),
+                Icon(Icons.search_off, size: 80, color: Colors.teal.withValues(alpha: 0.2)),
                 const SizedBox(height: 10),
-                ElevatedButton(
-                    onPressed: startAlarm,
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                    child: const Text("2. Start Alarm")),
-                const SizedBox(height: 10),
-                ElevatedButton(
-                    onPressed: stopAlarm,
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                    child: const Text("Stop Alarm")),
-              ]
-            ]
-          ],
+                const Text("Bhai, kuch search toh karo! 🔍", style: TextStyle(color: Colors.grey)),
+              ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: Colors.teal),
+          const SizedBox(width: 10),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 15),
+                children: [
+                  TextSpan(text: "$label: ", style: const TextStyle(fontWeight: FontWeight.bold)),
+                  TextSpan(text: value),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
